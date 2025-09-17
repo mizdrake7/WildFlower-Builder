@@ -139,14 +139,6 @@ jobs:
             fi 
           fi
 
-      - name: Fix Less Then 6.6.50 Builds
-        if: inputs.android_version == 'android15' && inputs.kernel_version == '6.6'
-        run: |
-          cd "$CONFIG/common"
-          if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
-              sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
-          fi
-
       - name: Apply ptrace patch for older kernels
         if: fromJSON(inputs.kernel_version) < 5.16
         run: |
@@ -205,36 +197,6 @@ jobs:
           cd "$CONFIG/common"
           cp ../../kernel_patches/wild/hooks/scope_min_manual_hooks_v1.4.patch ./
           patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.4.patch
-
-      - name: Apply Module Symbol Version Fix Patch
-        run: |
-          if [[ "${{ inputs.kernel_version }}" == "6.1" || "${{ inputs.kernel_version }}" == "6.6" ]]; then
-            cd "$CONFIG/common/kernel/module"
-            #sed -i 's/pr_warn("%s: disagrees about version of symbol %s\\n"/pr_warn("%s: disagrees about version of symbol %s, but ignore...\\n"/' version.c
-            sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' version.c
-          else
-            cd "$CONFIG/common/kernel"
-            #sed -i 's/pr_warn("%s: disagrees about version of symbol %s\\n"/pr_warn("%s: disagrees about version of symbol %s, but ignore...\\n"/' module.c
-            sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' module.c
-          fi
-
-      - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
-        if: ${{ ( inputs.kernel_version == '6.6' ) }}
-        run: |
-          SYMBOL_LIST=$CONFIG/common/android/abi_gki_aarch64_galaxy
-          echo "kdp_set_cred_non_rcu" >> $SYMBOL_LIST
-          echo "kdp_usecount_dec_and_test" >> $SYMBOL_LIST
-          echo "kdp_usecount_inc" >> $SYMBOL_LIST
-          
-          cd $CONFIG/common
-          PATCH="../../kernel_patches/samsung/min_kdp/add-min_kdp-symbols.patch"
-          if patch -p1 --dry-run < $PATCH; then
-            patch -p1 --no-backup-if-mismatch < $PATCH
-          fi
-          
-          cd drivers
-          cp "../../../kernel_patches/samsung/min_kdp/min_kdp.c" min_kdp.c
-          echo "obj-y += min_kdp.o" >> Makefile
 
       - name: Apply Kernel Configuration
         run: |
@@ -324,13 +286,13 @@ jobs:
           
           #Set Kernel Name
           if [ "${{ matrix.build_type }}" = "make" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}-${{ inputs.android_version }}-Wild"/s' ./common/scripts/setlocalversion
+            perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}-${{ inputs.android_version }}-WildFlower"/s' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "make" ]; then
-            perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\-${{ inputs.android_version }}-Wild"/s' ./common/scripts/setlocalversion
+            perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\-${{ inputs.android_version }}-WildFlower"/s' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "normal" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}-Wild"/s' ./common/scripts/setlocalversion
+            perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}-WildFlower"/s' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "normal" ]; then
-            perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\$res-Wild"/s' ./common/scripts/setlocalversion
+            perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\$res-WildFlower"/s' ./common/scripts/setlocalversion
           fi
 
           #Set Kernel Timestamp
@@ -568,7 +530,7 @@ jobs:
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
           cp ./boot-lz4.img ../WKSU-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.$SUBLEVEL_FOR_NAME-${{ inputs.os_patch_level }}-boot-lz4.img
 
-      - name: Android 13/14/15 boot image build script
+      - name: Boot image build script
         if: ${{ inputs.android_version == 'android13' || inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
         run: |
           cd bootimgs
