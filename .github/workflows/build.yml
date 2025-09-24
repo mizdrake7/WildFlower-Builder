@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 120
     strategy:
       matrix:
-        build_type: ["make", "normal"]
+        build_type: ["normal"]
 
     steps:
       # # - name: Maximize Build Space
